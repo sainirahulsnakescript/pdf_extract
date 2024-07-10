@@ -73,12 +73,29 @@
 
 
 
-import os as os
-import sys as sys
-sys.path.append(os.path.abspath("wrappers/python/XmlDocx"))
-import XmlDocx as XmlDocx
-document = XmlDocx.XmlDocx("water/config.xml")
-document.setDocumentProperties("water/settings.xml")
-document.addContent("water/content.xml")
-document.setXmlDocxPath("modified_SDCIT.docx")
-document.render()
+# import os as os
+# import sys as sys
+# sys.path.append(os.path.abspath("wrappers/python/XmlDocx"))
+# import XmlDocx as XmlDocx
+# document = XmlDocx.XmlDocx("water/config.xml")
+# document.setDocumentProperties("water/settings.xml")
+# document.addContent("water/content.xml")
+# document.setXmlDocxPath("modified_SDCIT.docx")
+# document.render()
+
+from docx import Document
+from PyPDF2 import PdfFileWriter, PdfFileReader
+from io import BytesIO
+
+def convert_docx_to_pdf(docx_filename, pdf_filename):
+    doc = Document(docx_filename)
+    pdf_writer = PdfFileWriter()
+
+    for paragraph in doc.paragraphs:
+        pdf_writer.addPage(PdfFileReader(BytesIO(paragraph.text.encode('utf-8'))).getPage(0))
+
+    with open(pdf_filename, 'wb') as pdf_file:
+        pdf_writer.write(pdf_file)
+
+# Usage example:
+convert_docx_to_pdf("input_file.docx", "output_file.pdf")
