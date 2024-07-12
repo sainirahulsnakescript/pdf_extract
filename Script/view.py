@@ -5,11 +5,12 @@ import os
 import shutil
 import random
 import string
-from testing import *
+
+
 def Get_New_PDF(input_pdf_path,Header_image_path):
     try:
         # Folder_name = ''.join(random.choices(string.ascii_letters + string.digits, k=10))
-        Folder_name = 'akHR4gP5ob'
+        Folder_name = '31RxuSOkKF'
         # Folder_name = 'iPQLyDHm1E'
         output_docx = Folder_name+'/modified_SDCIT.docx'
         output_pdf = Folder_name+'/Without_watermark.pdf'
@@ -40,6 +41,7 @@ def Get_New_PDF(input_pdf_path,Header_image_path):
         add_page_border(doc)
         create_index_of_heading(doc)
         doc.save(output_docx)
+        # convert_docx_to_pdf(output_docx,output_pdf)
         convert(output_docx, output_pdf)
         add_custom_page_at_start(output_pdf,output_pdf,'flexon_logo.png',version)
         add_watermark_to_pdf(output_pdf,'Final.pdf' )

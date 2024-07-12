@@ -770,21 +770,21 @@ def create_index_of_heading(document):
     document.save(modified_doc_name)
 
 
-import win32com.client
-import os
-def convert_docx_to_pdf(docx_path, pdf_path):
-    try:
-        # Create an instance of Word application
-        word_app = win32com.client.Dispatch("Word.Application")
-        word_app.Visible = False # Run in the background        
-        # Open the DOCX file 
-        doc = word_app.Documents.Open(os.path.abspath(docx_path))# Save as PDF        
-        doc.SaveAs(os.path.abspath(pdf_path), FileFormat=17) # 17 is the wdFormatPDF constant        
-        doc.Close() # Quit the Word application        
-        word_app.Quit()
-        print(f"Conversion successful: {docx_path} to {pdf_path}") 
-    except Exception as e:
-        print(f"An error occurred: {e}")# Usage 
+# import win32com.client
+# import os
+# def convert_docx_to_pdf(docx_path, pdf_path):
+#     try:
+#         # Create an instance of Word application
+#         word_app = win32com.client.Dispatch("Word.Application")
+#         word_app.Visible = False # Run in the background        
+#         # Open the DOCX file 
+#         doc = word_app.Documents.Open(os.path.abspath(docx_path))# Save as PDF        
+#         doc.SaveAs(os.path.abspath(pdf_path), FileFormat=17) # 17 is the wdFormatPDF constant        
+#         doc.Close() # Quit the Word application        
+#         word_app.Quit()
+#         print(f"Conversion successful: {docx_path} to {pdf_path}") 
+#     except Exception as e:
+#         print(f"An error occurred: {e}")# Usage 
 
 # docx_filename = "D:\Projects\pdf\modified_SDCIT.docx"
 # pdf_filename = "D:\Projects\pdf\output_file.pdf"
