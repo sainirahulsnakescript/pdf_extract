@@ -19,6 +19,8 @@ from pdf2docx import Converter
 import fitz
 from docx.oxml.ns import nsdecls
 import docx
+import win32com.client
+import os
 
 
 def convert_pdf_to_docx(file_path):
@@ -33,30 +35,48 @@ def convert_pdf_to_docx(file_path):
         print(f"Error converting {file_path}: {e}")
 
 def is_heading(paragraph):
-    # Check if any line in the paragraph starts with an integer followed by a dot and a space or an integer followed by a space
     for line in paragraph.text.splitlines():
-        if re.match(r'^\d+(\.| ) ', line):
+        if re.match(r'^\d+(\.| |\t).*', line):
+            if paragraph.style.name == 'Heading 1':
+                return True
             # Check if any run in the paragraph is bold and size is >= 12
-            for run in paragraph.runs:
-                if line in run.text and run.bold and run.font.size and run.font.size.pt >= 12:
-                    return True
+            # for run in paragraph.runs:
+            #     if line in run.text and run.bold and run.font.size and run.font.size.pt >= 12:
+            #         return True
     return False
 
 def is_subheading(paragraph):
     for line in paragraph.text.splitlines():
-        if re.match(r'^\d+\.\d+', line):
+        if re.match(r'^\d+\.\d+(\.| |\t)', line):
+            if paragraph.style.name == 'Heading 2':
+                    return True
+            elif paragraph.style.name == 'Heading 3':
+                return False
             for run in paragraph.runs:
-                if line in run.text and run.bold and run.font.size and run.font.size.pt >= 12:
-                    return re.match(r'^\d+\.\d+', line)
+                if run.text in line and run.bold:
+                    return True
+
     # Check if paragraph starts with a subheading number pattern (e.g., 1.1, 2.3, ...)
+    return False
 
 def is_subheading_heading(paragraph):
     for line in paragraph.text.splitlines():
         if re.match(r'^\d+\.\d+', line):
-            return re.match(r'^\d+\.\d+', line)
+            return True
 
 
-def remove_content_above_first_heading(doc):
+def is_sub_subheading(paragraph):
+    for line in paragraph.text.splitlines():
+        if re.match(r'^\d+\.\d+\.\d+', line):
+            if paragraph.style.name == 'Heading 3':
+                return True
+            for run in paragraph.runs:
+                if run.text in line or run.bold:
+                    return True
+    return False
+
+
+def remove_content_above_first_headingsssss(doc):
     first_heading_index = None
 
     # Find the first heading
@@ -73,8 +93,29 @@ def remove_content_above_first_heading(doc):
                 elements_to_remove.append(element)
             else:
                 break
-        
+
         for element in elements_to_remove:
+            element.getparent().remove(element)
+
+
+
+
+def remove_content_above_first_heading(doc):
+    first_heading_index = None
+
+    # Find the index of the first heading
+    for i, paragraph in enumerate(doc.paragraphs):
+        if is_heading(paragraph):
+            first_heading_index = i
+            break
+
+    if first_heading_index is not None:
+        # Remove paragraphs before the first heading
+        for i in range(first_heading_index):
+            doc.paragraphs[i].clear()  # Clear the content of the paragraph
+
+        # Remove any additional content like tables, images, etc., if needed
+        for element in doc.element.body[:first_heading_index]:
             element.getparent().remove(element)
 
 
@@ -112,13 +153,13 @@ def Format_doc(doc):
                 if br.get(qn('w:type')) == 'page':
                     runs_to_modify.append(run)
                     break  # No need to check further if a page break is found
-        
+
             # Iterate through paragraphs
-        
+
         # # Merge content with adjacent paragraphs
         # for run in runs_to_modify:
         #     run_index = paragraph.runs.index(run)
-            
+
         #     if run_index < len(paragraph.runs) - 1:
         #         # Merge text with the next run in the current paragraph
         #         next_run = paragraph.runs[run_index + 1]
@@ -131,7 +172,7 @@ def Format_doc(doc):
         #             next_paragraph.text = run.text+ ' ' + next_paragraph.text
         #             run.clear()
         #             paragraphs_to_remove.append(paragraph)
-    
+
     # # Remove empty paragraphs after merging
     # for paragraph in paragraphs_to_remove:
     #     p_element = paragraph._element
@@ -146,7 +187,7 @@ def Format_doc(doc):
     #                 # Replace more than 3 consecutive spaces with single space
     #                 modified_text = ' '.join(text.split())
     #                 run.text = modified_text
-    
+
     # Remove entirely empty paragraphs
     # empty_paragraphs = [p for p in doc.paragraphs if not p.text.strip()]
     # for paragraph in empty_paragraphs:
@@ -154,10 +195,28 @@ def Format_doc(doc):
     #     if not paragraph._element.xpath('.//w:drawing') and not paragraph._element.xpath('.//w:tbl'):
     #         p_element = paragraph._element
     #         p_element.getparent().remove(p_element)
-    
+
     for table in doc.tables:
         table.alignment = WD_TABLE_ALIGNMENT.CENTER
-        lock_table(table)
+
+
+
+def remove_header_footer(doc):
+    # Disable different headers and footers for odd and even pages
+    doc.settings.odd_and_even_pages_header_footer = False
+
+    # Function to clear all elements in a header or footer
+    def clear_element(element):
+        for child in element._element.getchildren():
+            element._element.remove(child)
+
+    # Remove header
+    for section in doc.sections:
+        clear_element(section.header)
+
+    # Remove footer
+    for section in doc.sections:
+        clear_element(section.footer)
 
 
 
@@ -178,7 +237,7 @@ def start_each_heading_from_new_page(doc):
             heading_paragraph = page_break_paragraph.insert_paragraph_before()
             heading_paragraph.alignment = WD_PARAGRAPH_ALIGNMENT.LEFT
             heading_paragraph.style = 'Heading 1'
-            heading_run = heading_paragraph.add_run(heading_line)
+            heading_run = heading_paragraph.add_run(heading_line.replace("\t", ""))
             heading_run.bold = True
             heading_run.font.size = Pt(14)  # Adjust font size as needed
             heading_run.font.color.rgb = RGBColor(0, 0, 0)  # Set font color to black
@@ -189,7 +248,7 @@ def start_each_heading_from_new_page(doc):
             # Insert remaining lines after the heading
             for line in reversed(lines[1:]):  # Insert in reverse to maintain order
                 if line.strip():  # Skip empty lines
-                    new_paragraph = paragraph.insert_paragraph_before(line)
+                    new_paragraph = paragraph.insert_paragraph_before(line.replace("\t", ""))
                     if is_subheading_heading(new_paragraph):
                         new_paragraph.style = 'Heading 2'
                         for run in new_paragraph.runs:
@@ -240,9 +299,8 @@ def set_page_size_to_a4(doc):
 
 
 def add_header_with_image_size(doc, image_path, width_cm, height_cm):
-    print('header')
     section = doc.sections[0]  # Get the first section of the document
-
+    doc.sections[0].header_distance  = 362585
     # Add header
     header = section.header
     header_paragraph = header.paragraphs[0] if header.paragraphs else header.add_paragraph()
@@ -263,33 +321,38 @@ def add_footer_with_page_number(doc):
     if len(doc.sections) == 0:
         doc.add_section()
 
-    # Set different header/footer for first page of first section
-    first_section = doc.sections[0]
-    # first_section.different_first_page_header_footer = True
-
-    # Add footer to all sections
+    # Set the starting page number for each section to 1
     for section in doc.sections:
+        section.start_type = WD_SECTION_START.NEW_PAGE
+        section.footer.is_linked_to_previous = False
+        section.start_type = WD_SECTION_START.NEW_PAGE
+
         footer = section.footer
         footer_paragraph = footer.paragraphs[0] if footer.paragraphs else footer.add_paragraph()
 
-        # Add page number field to footer, skipping the first page of the first section
-        if section != first_section or (section == first_section and section.start_type == WD_SECTION_START.NEW_PAGE):
-            run = footer_paragraph.add_run()
-            fld_char_begin = OxmlElement('w:fldChar')
-            fld_char_begin.set(qn('w:fldCharType'), 'begin')
-            run._r.append(fld_char_begin)
+        # Add page number field to footer
+        run = footer_paragraph.add_run()
+        fld_char_begin = OxmlElement('w:fldChar')
+        fld_char_begin.set(qn('w:fldCharType'), 'begin')
+        run._r.append(fld_char_begin)
 
-            instr_text = OxmlElement('w:instrText')
-            instr_text.set(qn('xml:space'), 'preserve')
-            instr_text.text = "PAGE"
-            run._r.append(instr_text)
+        instr_text = OxmlElement('w:instrText')
+        instr_text.set(qn('xml:space'), 'preserve')
+        instr_text.text = "PAGE \* Arabic \* MERGEFORMAT"
+        run._r.append(instr_text)
 
-            fld_char_end = OxmlElement('w:fldChar')
-            fld_char_end.set(qn('w:fldCharType'), 'end')
-            run._r.append(fld_char_end)
+        fld_char_end = OxmlElement('w:fldChar')
+        fld_char_end.set(qn('w:fldCharType'), 'end')
+        run._r.append(fld_char_end)
 
-            # Align page number to the right
-            footer_paragraph.alignment = WD_ALIGN_PARAGRAPH.RIGHT
+        # Align page number to the right
+        footer_paragraph.alignment = WD_ALIGN_PARAGRAPH.RIGHT
+        # Start page numbering from 1 for each section
+        sect_pr = section._sectPr
+        pg_num_type = OxmlElement('w:pgNumType')
+        pg_num_type.set(qn('w:start'), '1')
+        sect_pr.append(pg_num_type)
+        section.footer_distance = 257200
 
 
 
@@ -309,34 +372,6 @@ def add_page_border(doc, border_space=15):
 
         section_start.append(border_element)
 
-# def set_page_size_to_a4(doc):
-#     for table in doc.tables:
-#         table.alignment = WD_TABLE_ALIGNMENT.CENTER
-#     for section in doc.sections:
-#         section.page_width = Cm(21)
-#         section.page_height = Cm(29.7)
-
-#     # Ensure all sections have the same page size
-#     for section in doc.sections:
-#         section.start_type = WD_SECTION_START.NEW_PAGE
-
-
-# def set_page_size_to_a4(doc):
-#     # Set table alignment
-#     # for table in doc.tables:
-#     #     table.alignment = WD_TABLE_ALIGNMENT.CENTER
-
-#     # Set page size to A4 and margins to normal (2.54 cm)
-#     for section in doc.sections:
-#         section.page_width = Cm(21)
-#         section.page_height = Cm(29.7)
-#         section.top_margin = Cm(2.54)
-#         section.bottom_margin = Cm(2.54)
-#         section.left_margin = Cm(2.54)
-#         section.right_margin = Cm(2.54)
-
-#         # Ensure all sections start on a new page
-#         section.start_type = WD_SECTION_START.NEW_PAGE
 
 
 def delete_element(element):
@@ -356,7 +391,7 @@ def remove_headings_with_content(doc, headings):
     delete = False
     elements_to_delete = []
     headings_to_remove = set(headings)
-    
+
     for element in doc.element.body:
         # Check if the element is a paragraph
         if element.tag.endswith('p'):
@@ -369,7 +404,7 @@ def remove_headings_with_content(doc, headings):
                     break
         if delete:
             elements_to_delete.append(element)
-    
+
     for element in elements_to_delete:
         delete_element(element)
 
@@ -393,71 +428,88 @@ def prompt_for_headings_to_remove(headings):
     except ValueError:
         print("Invalid input. Please enter numbers separated by commas.")
         return prompt_for_headings_to_remove(headings)
-    
 
 
 
-def replace_heading_numbering(doc):
-    main_number = 0  # Initialize main heading number
-    sub_number = 0  # Initialize subheading number
-    current_main_number = 0  # Track current main heading number
-    current_sub_number = 0  # Track current subheading number
-    
+
+def replace_heading_numberingssssss(doc):
+    main_number = 0
+    sub_number = 0
+    sub_sub_number = 0
+    current_main_number = 0
+    current_sub_number = 0
+    current_sub_sub_number = 0
+
     for paragraph in doc.paragraphs:
         if is_heading(paragraph):
             # Determine heading level and adjust numbering accordingly
-            if re.match(r'^\d+\. ', paragraph.text.strip()):
+            if re.match(r'^\d+(\.| )', paragraph.text.strip()):
                 current_main_number += 1
                 main_number = current_main_number  # Update main_number to current main heading number
                 sub_number = 0  # Reset sub-number for new main heading
             elif re.match(r'^\d+\.\d+', paragraph.text.strip()):  # Detecting subheading format like 1.1, 1.2
                 current_sub_number += 1
                 sub_number = current_sub_number  # Update sub_number to current subheading number
-            
+
             # Construct new heading text with updated numbering
-            if re.match(r'^\d+\. ', paragraph.text.strip()):
-                new_heading_text = "{}. {}".format(main_number, re.sub(r'^\d+\. ', '', paragraph.text.strip()))
+            if re.match(r'^\d+(\.| )', paragraph.text.strip()):
+                new_heading_text = "{}. {}".format(main_number, re.sub(r'^\d+(\.| )', '', paragraph.text.strip()))
             elif re.match(r'^\d+\.\d+', paragraph.text.strip()):  # Detecting subheading format like 1.1, 1.2
                 new_heading_text = "{}.{}. {}".format(main_number, sub_number, re.sub(r'^\d+\.\d+\s*', '', paragraph.text.strip()))
             else:
                 new_heading_text = paragraph.text.strip()
-            
+
             # Replace heading text with updated numbering
             paragraph.text = new_heading_text
-            # paragraph.style = 'Heading 1'
-            
+            paragraph.style = 'Heading 1'
+
             # Apply bold and size 14 to heading
             for run in paragraph.runs:
                 run.bold = True
                 run.font.size = Pt(14)
-                run.font.color.rgb = RGBColor(0, 0, 0) 
-        
+                run.font.color.rgb = RGBColor(0, 255, 0) 
+
         elif is_subheading(paragraph):
             # If it's a subheading (e.g., 1.1, 1.2, ...), update its numbering
             sub_number += 1  # Increment sub_number within the current main heading
-            
+            current_sub_sub_number = 0
             # Split the text to extract the heading number and the text after it
             heading_number, heading_text = re.split(r'\s+', paragraph.text.strip(), 1)
-            
+
             # Split the heading text into lines
             lines = heading_text.splitlines()
-            
+
             # Construct new subheading text with updated numbering for the first line only
             if lines:
                 first_line_text = lines[0].strip()
                 remaining_lines = "\n".join(lines[1:]) if len(lines) > 1 else ""  # Join remaining lines if any
                 new_subheading_text = "{}.{}. {}".format(main_number, sub_number, first_line_text)
                 paragraph.text = new_subheading_text
-            
+
             # Apply style only to the first line
-            # paragraph.style = 'Heading 2'  
-            
+            paragraph.style = 'Heading 2'
+
             # Apply bold and size 12 to subheading for the first line only
             for run in paragraph.runs:
                 run.bold = True
                 run.font.size = Pt(12)
-                run.font.color.rgb = RGBColor(0, 0, 0)  # Set font color to black
+                run.font.color.rgb = RGBColor(255, 0, 0)  # Set font color to black
 
+        elif is_sub_subheading(paragraph):
+            current_sub_sub_number += 1
+            sub_sub_number = current_sub_sub_number
+            heading_number, heading_text = re.split(r'\s+', paragraph.text.strip(), 1)
+            lines = heading_text.splitlines()
+            if lines:
+                first_line_text = lines[0].strip()
+                remaining_lines = "\n".join(lines[1:]) if len(lines) > 1 else ""
+                new_sub_subheading_text = "{}.{}.{}. {}".format(main_number, sub_number, sub_sub_number, first_line_text)
+                paragraph.text = new_sub_subheading_text
+            paragraph.style = 'Heading 3'
+            for run in paragraph.runs:
+                run.bold = True
+                run.font.size = Pt(12)
+                run.font.color.rgb = RGBColor(0, 0, 255)
 
             # Append remaining lines back to the paragraph without any styling changes
             if remaining_lines:
@@ -495,22 +547,62 @@ def start_each_heading_from_new_line(doc):
                     # new_paragraph = doc.add_paragraph(line, style='Normal')
                     p = doc.paragraphs[idx+1]
                     r = p.insert_paragraph_before('\t'+line)
+        elif is_sub_subheading(paragraph):
+            lines = paragraph.text.splitlines()
+            heading_line = lines[0]
+
+            # Create a new paragraph for the subheading line
+            subheading_paragraph = paragraph.insert_paragraph_before(heading_line)
+            subheading_paragraph.alignment = WD_PARAGRAPH_ALIGNMENT.LEFT
+            subheading_paragraph.style = 'Heading 3'  # Assuming 'Heading 2' style for subheadings
+            subheading_paragraph.runs[0].bold = True
+            subheading_paragraph.runs[0].font.size = Pt(12)  # Adjust font size as needed
+            subheading_paragraph.runs[0].font.color.rgb = RGBColor(0, 0, 0)  # Set font color to black
+
+            # Remove the original subheading line from the paragraph
+            paragraph.clear()
+            # for run in paragraph.runs:
+            #     run.clear()
+
+            # Add remaining lines as new paragraphs after the original subheading paragraph
+            for line in reversed(lines[1:]):  # Insert in reverse to maintain order
+                if line.strip():  # Skip empty lines
+                    # Find the index of the current paragraph in the list
+                    idx = paragraphs.index(paragraph)
+                    # Insert new paragraph after the current paragraph
+                    # new_paragraph = doc.add_paragraph(line, style='Normal')
+                    p = doc.paragraphs[idx+1]
+                    r = p.insert_paragraph_before('\t'+line)
 
         i -= 1
 
 def remove_empty_and_excessive_spaces(doc):
     paragraphs_to_remove = []
-    
-    # Identify paragraphs to remove (entirely empty)
+    namespaces = {
+        'w': 'http://schemas.openxmlformats.org/wordprocessingml/2006/main',
+        'a': 'http://schemas.openxmlformats.org/drawingml/2006/main',
+        'pic': 'http://schemas.openxmlformats.org/drawingml/2006/picture'
+    }
     for paragraph in doc.paragraphs:
-        if not paragraph.text.strip() and not paragraph._element.xpath('.//w:drawing') and not paragraph._element.xpath('.//w:tbl'):
-            paragraphs_to_remove.append(paragraph)
-    
+        if not paragraph.text.strip():
+            # Check if the paragraph has a drawing that contains a picture
+            has_image = any(
+                drawing.xpath('.//pic:pic')
+                for drawing in paragraph._element.xpath('.//w:drawing')
+            )
+
+            # Check for tables
+            has_table = paragraph._element.xpath('.//w:tbl')
+
+            # If the paragraph is empty, does not contain an image, and does not contain a table, mark it for removal
+            if not has_image and not has_table:
+                paragraphs_to_remove.append(paragraph)
+
     # Remove identified paragraphs
     for paragraph in paragraphs_to_remove:
         p_element = paragraph._element
         p_element.getparent().remove(p_element)
-    
+
     # Remove excessive spaces in the text
     for paragraph in doc.paragraphs:
         if len(paragraph.runs) > 0:
@@ -525,7 +617,7 @@ def start_each_heading1_from_new_page(doc):
     first_heading_encountered = False
     paragraphs = list(doc.paragraphs)
     last_heading_index = -1
-    
+
     # Identify the index of the last heading
     for i, paragraph in enumerate(paragraphs):
         if is_heading(paragraph):
@@ -547,7 +639,7 @@ def start_each_heading1_from_new_page(doc):
 
 def add_watermark_to_pdf(input_pdf_path, output_pdf_path):
     watermark_text = "FLEXXON CONFIDENTIAL"
-    
+
     # Create watermark
     buffer = BytesIO()
     c = canvas.Canvas(buffer, pagesize=A4)
@@ -601,14 +693,14 @@ def add_watermark_to_pdf(input_pdf_path, output_pdf_path):
 
 def add_custom_page_at_start(input_pdf, output_pdf, logo_path,version):
     reader = PdfReader(input_pdf)
-    
+
     first_page = reader.pages[0]
     width = float(first_page.mediabox.width)
     height = float(first_page.mediabox.height)
-    
+
     buffer = BytesIO()
     doc = SimpleDocTemplate(buffer, pagesize=(width, height))
-    
+
     styles = getSampleStyleSheet()
     title_style = ParagraphStyle(
         'Title',
@@ -631,7 +723,7 @@ def add_custom_page_at_start(input_pdf, output_pdf, logo_path,version):
         alignment=0,  # Left alignment
         leading=14,  # Line spacing
     )
-    
+
     footer_style = ParagraphStyle(
         'Footer',
         parent=styles['Normal'],
@@ -639,9 +731,9 @@ def add_custom_page_at_start(input_pdf, output_pdf, logo_path,version):
         alignment=0,  # Center alignment
         textColor= black,
     )
-    
+
     img = Image(logo_path, width=200, height=60)  # Adjust size as needed
-    
+
     elements = [
         img,
         Spacer(1, 70),
@@ -657,7 +749,7 @@ def add_custom_page_at_start(input_pdf, output_pdf, logo_path,version):
         Paragraph("Website: http://www.flexxon.com", normal_style),
         Paragraph("Email: flexxon@flexxon.com", normal_style),
     ]
-    
+
     def add_footer(canvas, doc):
         canvas.saveState()
         footer_text = "ALL RIGHTS ARE STRICTLY RESERVED. ANY PORTION OF THIS PAPER SHALL NOT BE REPRODUCED, COPIED, OR TRANSLATED TO ANY OTHER FORMS WITHOUT PERMISSION FROM FLEXXON."
@@ -665,36 +757,36 @@ def add_custom_page_at_start(input_pdf, output_pdf, logo_path,version):
         w, h = footer.wrap(doc.width, doc.bottomMargin)
         footer.drawOn(canvas, doc.leftMargin, h)
         canvas.restoreState()
-    
+
     # Build the PDF with the footer
     doc.build(elements, onFirstPage=add_footer, onLaterPages=add_footer)
-    
+
     # Create a PDF writer object
     writer = PdfWriter()
-    
+
     # Add the custom page
     custom_pdf = PdfReader(BytesIO(buffer.getvalue()))
     writer.add_page(custom_pdf.pages[0])
-    
+
     # Add all pages from the existing PDF
     for page in reader.pages:
         writer.add_page(page)
-    
+
     # Write the output to a file
     with open(output_pdf, "wb") as output_file:
         writer.write(output_file)
 
 
 
-def remove_header_footer(input_pdf, output_pdf, header_height, footer_height):
+def remove_header_footerssss(input_pdf, output_pdf, header_height, footer_height):
     try:
         pdf_document = fitz.open(input_pdf)
-        
+
         # Iterate through each page
         for page_num in range(len(pdf_document)):
             page = pdf_document.load_page(page_num)
             rect = page.rect
-            
+
             # Define new crop box to remove header and footer
             new_rect = fitz.Rect(
                 rect.x0,
@@ -702,10 +794,10 @@ def remove_header_footer(input_pdf, output_pdf, header_height, footer_height):
                 rect.x1,
                 rect.y1 - footer_height
             )
-            
+
             # Set the new crop box
             page.set_cropbox(new_rect)
-        
+
         # Save the modified PDF
         pdf_document.save(output_pdf)
         print(f"Successfully processed {input_pdf} and saved as {output_pdf}")
@@ -713,7 +805,7 @@ def remove_header_footer(input_pdf, output_pdf, header_height, footer_height):
     except Exception as e:
         print(f"An error occurred while processing the PDF: {e}")
         return f"An error occurred while processing the PDF: {e}"
-    
+
 
 def create_index_of_heading(document):
     # Create a new paragraph for the heading "Table of Contents"
@@ -765,28 +857,187 @@ def create_index_of_heading(document):
     body.insert(0, toc_heading._element)
     body.insert(1, toc_xml)
 
-    # Save the modified document with TOC
-    modified_doc_name = "modified_document_with_TOC.docx"
-    document.save(modified_doc_name)
 
 
-# import win32com.client
-# import os
-# def convert_docx_to_pdf(docx_path, pdf_path):
-#     try:
-#         # Create an instance of Word application
-#         word_app = win32com.client.Dispatch("Word.Application")
-#         word_app.Visible = False # Run in the background        
-#         # Open the DOCX file 
-#         doc = word_app.Documents.Open(os.path.abspath(docx_path))# Save as PDF        
-#         doc.SaveAs(os.path.abspath(pdf_path), FileFormat=17) # 17 is the wdFormatPDF constant        
-#         doc.Close() # Quit the Word application        
-#         word_app.Quit()
-#         print(f"Conversion successful: {docx_path} to {pdf_path}") 
-#     except Exception as e:
-#         print(f"An error occurred: {e}")# Usage 
+def convert_docx_to_pdf(docx_path, pdf_path):
+    try:
+        # Create an instance of Word application
+        word_app = win32com.client.Dispatch("Word.Application")
+        word_app.Visible = False # Run in the background        
+        # Open the DOCX file 
+        doc = word_app.Documents.Open(os.path.abspath(docx_path))# Save as PDF        
+        doc.SaveAs(os.path.abspath(pdf_path), FileFormat=17) # 17 is the wdFormatPDF constant        
+        doc.Close() # Quit the Word application        
+        word_app.Quit()
+        print(f"Conversion successful: {docx_path} to {pdf_path}") 
+    except Exception as e:
+        print(f"An error occurred: {e}")# Usage 
 
-# docx_filename = "D:\Projects\pdf\modified_SDCIT.docx"
-# pdf_filename = "D:\Projects\pdf\output_file.pdf"
 
-# convert_docx_to_pdf(docx_filename, pdf_filename)
+
+
+
+
+
+def convert_docx_to_pdf_windows(pdf_path,Foldername):
+    word = win32com.client.Dispatch("Word.Application")
+    word.visible = 0  # Change to 1 if you want to see Word application running
+
+    # Get file name and normalized path
+    filename = os.path.basename(pdf_path)
+    in_file = os.path.abspath(pdf_path)
+
+    # Fixed output directory for DOCX files
+    output_dir = r"F:\\pdf_extract\\"+Foldername  # Replace with your desired output directory
+
+    # Generate full path for DOCX file
+    docx_filename = filename[:-4] + ".docx"  # Remove .pdf extension and add .docx
+    docx_path = os.path.join(output_dir, docx_filename)
+
+    # Convert PDF to DOCX
+    wb = word.Documents.Open(in_file)
+    wb.SaveAs2(docx_path, FileFormat=16)
+    wb.Close()
+    word.Quit()
+
+    return docx_path
+
+def add_spacing_after_paragraph(paragraph,space = '200'):
+    p_pr = paragraph._element.get_or_add_pPr()
+    spacing = OxmlElement('w:spacing')
+    spacing.set(qn('w:after'), space)  # Space after paragraph in twips (200 twips = 0.25 inches)
+
+    p_pr.append(spacing)
+
+def add_bottom_border(paragraph):
+    p_pr = paragraph._element.get_or_add_pPr()
+    borders = OxmlElement('w:pBdr')
+    bottom = OxmlElement('w:bottom')
+    bottom.set(qn('w:val'), 'single')  # Border type (e.g., 'single', 'double', 'dotted', etc.)
+    bottom.set(qn('w:sz'), '15')       # Border size (in eighths of a point, so '4' means 0.5pt)
+    bottom.set(qn('w:space'), '8')    # Space between border and text
+    bottom.set(qn('w:color'), '000000') # Border color in hex (black in this case)
+
+    borders.append(bottom)
+    p_pr.append(borders)
+    spacing = OxmlElement('w:spacing')
+    spacing.set(qn('w:after'), '200')  # Space after paragraph in twips (200 twips = 0.25 inches)
+    p_pr.append(spacing)
+
+
+def replace_heading_numbering(doc):
+    main_number = 0
+    sub_number = 0
+    sub_sub_number = 0
+    current_main_number = 0
+    current_sub_number = 0
+    current_sub_sub_number = 0
+
+    for paragraph in doc.paragraphs:
+        if is_heading(paragraph):
+            current_main_number += 1
+            main_number = current_main_number
+            current_sub_number = 0
+            current_sub_sub_number = 0
+            new_heading_text = "{}. {}".format(main_number, re.sub(r'^\d+(\.| )', '', paragraph.text.strip()))
+            paragraph.text = new_heading_text
+            paragraph.style = 'Heading 1'
+            add_bottom_border(paragraph)
+            for run in paragraph.runs:
+                # run.bold = True
+                run.font.size = Pt(16)
+                run.font.color.rgb = RGBColor(0, 0, 0)
+
+        elif is_subheading(paragraph):
+            current_sub_number += 1
+            sub_number = current_sub_number
+            current_sub_sub_number = 0
+            heading_number, heading_text = re.split(r'\s+', paragraph.text.strip(), 1)
+            lines = heading_text.splitlines()
+            if lines:
+                first_line_text = lines[0].strip()
+                remaining_lines = "\n".join(lines[1:]) if len(lines) > 1 else ""
+                new_subheading_text = "\t{}.{}. {}".format(main_number, sub_number, first_line_text)
+                paragraph.text = new_subheading_text
+            paragraph.style = 'Heading 2'
+            add_spacing_after_paragraph(paragraph)
+            for run in paragraph.runs:
+                # run.bold = True
+                run.font.size = Pt(14)
+                run.font.color.rgb = RGBColor(0, 0, 0)
+            if remaining_lines:
+                paragraph.add_run('\n' + remaining_lines)
+
+        elif is_sub_subheading(paragraph):
+            current_sub_sub_number += 1
+            sub_sub_number = current_sub_sub_number
+            heading_number, heading_text = re.split(r'\s+', paragraph.text.strip(), 1)
+            lines = heading_text.splitlines()
+            if lines:
+                first_line_text = lines[0].strip()
+                remaining_lines = "\n".join(lines[1:]) if len(lines) > 1 else ""
+                new_sub_subheading_text = "\t\t{}.{}.{}. {}".format(main_number, sub_number, sub_sub_number, first_line_text)
+                paragraph.text = new_sub_subheading_text
+            paragraph.style = 'Heading 3'
+            add_spacing_after_paragraph(paragraph)
+            for run in paragraph.runs:
+                # run.bold = True
+                run.font.size = Pt(12)
+                run.font.color.rgb = RGBColor(0, 0, 0)
+            if remaining_lines:
+                paragraph.add_run('\n' + remaining_lines)
+
+
+def remove_line_under_heading1(doc):
+    for paragraph in doc.paragraphs:
+        if paragraph.style.name == 'Heading 1':
+            for run in paragraph.runs:
+                for shape in run.inline_shapes:
+                    if shape.type == 3:  # Check if it's a line shape (type 3)
+                        # Remove the line shape
+                        shape._element.getparent().remove(shape._element)
+
+
+def update_toc_with_win32(doc_path):
+    word = win32com.client.Dispatch("Word.Application")
+    word.Visible = False
+
+    doc = word.Documents.Open(os.path.abspath(doc_path))
+    doc.TablesOfContents(1).Update()
+    doc.Save()
+    doc.Close()
+    word.Quit()
+
+
+
+
+def add_watermark(doc_path, watermark_text):
+    # Create a new instance of Word
+    word = win32com.client.Dispatch("Word.Application")
+
+    # Open the input DOCX file
+    doc = word.Documents.Open(os.path.abspath(doc_path))
+
+    # Select all the content in the document
+    selection = word.Selection
+    selection.WholeStory()
+
+    # Add the watermark
+    shape = selection.ShapeRange.AddTextEffect(
+        Text=watermark_text,
+        FontName='Arial',
+        FontSize=40,
+        Bold=False,
+        Italic=True
+    )
+    shape.Fill.Visible = True
+    shape.Fill.Solid()
+    shape.Fill.ForeColor.RGB = 0xCCCCCC  # Light grey color
+    shape.Line.Visible = False
+
+    # Save the modified document
+    doc.SaveAs()
+
+    # Close the document and Word application
+    doc.Close()
+    word.Quit()
