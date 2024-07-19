@@ -37,7 +37,6 @@ This project provides a Python script to convert PDF files to DOCX, perform vari
 1. Clone the repository:
     ```sh
     git clone https://github.com/yourusername/pdf-docx-formatting.git
-    cd pdf-docx-formatting
     ```
 
 2. Install the required packages:
