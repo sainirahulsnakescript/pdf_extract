@@ -17,7 +17,7 @@ def Get_New_PDF(input_pdf_path,Header_image_path):
         os.makedirs(Folder_name,exist_ok=True)
         width_cm = 5.00
         height_cm = 1.44
-        without_header_footer_file_path = remove_header_footerssss(input_pdf_path,Folder_name+'/without_header_footer.pdf',70, 70)
+        without_header_footer_file_path = remove_header_footer(input_pdf_path,Folder_name+'/without_header_footer.pdf',70, 70)
         docx_path =  convert_docx_to_pdf_windows(without_header_footer_file_path,Folder_name)
         doc = Document(docx_path)
         remove_header_footer(doc)

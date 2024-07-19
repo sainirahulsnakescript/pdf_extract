@@ -704,7 +704,7 @@ def add_custom_page_at_start(input_pdf, output_pdf, logo_path,version):
 
 
 
-def remove_header_footerssss(input_pdf, output_pdf, header_height, footer_height):
+def remove_header_footer(input_pdf, output_pdf, header_height, footer_height):
     try:
         pdf_document = fitz.open(input_pdf)
 
