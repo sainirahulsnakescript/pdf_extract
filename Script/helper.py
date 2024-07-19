@@ -76,27 +76,6 @@ def is_sub_subheading(paragraph):
     return False
 
 
-def remove_content_above_first_headingsssss(doc):
-    first_heading_index = None
-
-    # Find the first heading
-    for i, paragraph in enumerate(doc.paragraphs):
-        if is_heading(paragraph):
-            first_heading_index = i
-            break
-
-    if first_heading_index is not None:
-        # Remove all elements before the first heading
-        elements_to_remove = []
-        for i, element in enumerate(doc.element.body):
-            if i < first_heading_index:
-                elements_to_remove.append(element)
-            else:
-                break
-
-        for element in elements_to_remove:
-            element.getparent().remove(element)
-
 
 
 
@@ -153,48 +132,6 @@ def Format_doc(doc):
                 if br.get(qn('w:type')) == 'page':
                     runs_to_modify.append(run)
                     break  # No need to check further if a page break is found
-
-            # Iterate through paragraphs
-
-        # # Merge content with adjacent paragraphs
-        # for run in runs_to_modify:
-        #     run_index = paragraph.runs.index(run)
-
-        #     if run_index < len(paragraph.runs) - 1:
-        #         # Merge text with the next run in the current paragraph
-        #         next_run = paragraph.runs[run_index + 1]
-        #         next_run.text = run.text + ' ' +  next_run.text
-        #         run.clear()
-        #     else:
-        #         # Merge text with the next paragraph
-        #         next_paragraph = paragraph._element.getnext()
-        #         if next_paragraph is not None:
-        #             next_paragraph.text = run.text+ ' ' + next_paragraph.text
-        #             run.clear()
-        #             paragraphs_to_remove.append(paragraph)
-
-    # # Remove empty paragraphs after merging
-    # for paragraph in paragraphs_to_remove:
-    #     p_element = paragraph._element
-    #     p_element.getparent().remove(p_element)
-
-    # # Remove excessive spaces
-    # for paragraph in doc.paragraphs:
-    #     if len(paragraph.runs) > 0:
-    #         for run in paragraph.runs:
-    #             text = run.text
-    #             if text.count(' ') >= 3:
-    #                 # Replace more than 3 consecutive spaces with single space
-    #                 modified_text = ' '.join(text.split())
-    #                 run.text = modified_text
-
-    # Remove entirely empty paragraphs
-    # empty_paragraphs = [p for p in doc.paragraphs if not p.text.strip()]
-    # for paragraph in empty_paragraphs:
-    #     # Ensure the paragraph is truly empty and does not contain images or tables
-    #     if not paragraph._element.xpath('.//w:drawing') and not paragraph._element.xpath('.//w:tbl'):
-    #         p_element = paragraph._element
-    #         p_element.getparent().remove(p_element)
 
     for table in doc.tables:
         table.alignment = WD_TABLE_ALIGNMENT.CENTER
@@ -631,10 +568,6 @@ def start_each_heading1_from_new_page(doc):
                     paragraph.insert_paragraph_before().add_run().add_break(WD_BREAK.PAGE)
 
 
-
-
-
-
 # Water Function
 
 def add_watermark_to_pdf(input_pdf_path, output_pdf_path):
@@ -681,13 +614,6 @@ def add_watermark_to_pdf(input_pdf_path, output_pdf_path):
     # Save the output PDF
     with open(output_pdf_path, "wb") as output_file:
         output_pdf.write(output_file)
-
-
-
-
-
-
-
 
 
 
@@ -1005,39 +931,5 @@ def update_toc_with_win32(doc_path):
     doc = word.Documents.Open(os.path.abspath(doc_path))
     doc.TablesOfContents(1).Update()
     doc.Save()
-    doc.Close()
-    word.Quit()
-
-
-
-
-def add_watermark(doc_path, watermark_text):
-    # Create a new instance of Word
-    word = win32com.client.Dispatch("Word.Application")
-
-    # Open the input DOCX file
-    doc = word.Documents.Open(os.path.abspath(doc_path))
-
-    # Select all the content in the document
-    selection = word.Selection
-    selection.WholeStory()
-
-    # Add the watermark
-    shape = selection.ShapeRange.AddTextEffect(
-        Text=watermark_text,
-        FontName='Arial',
-        FontSize=40,
-        Bold=False,
-        Italic=True
-    )
-    shape.Fill.Visible = True
-    shape.Fill.Solid()
-    shape.Fill.ForeColor.RGB = 0xCCCCCC  # Light grey color
-    shape.Line.Visible = False
-
-    # Save the modified document
-    doc.SaveAs()
-
-    # Close the document and Word application
     doc.Close()
     word.Quit()

@@ -1,4 +1,4 @@
-from helper import *
+from .helper import *
 from docx import Document
 from docx2pdf import convert
 import os
@@ -11,12 +11,14 @@ def Get_New_PDF(input_pdf_path,Header_image_path):
     try:
         Folder_name = 'output/'+ ''.join(random.choices(string.ascii_letters + string.digits, k=10))
         output_docx = Folder_name+'/modified_SDCIT.docx'
-        output_pdf = Folder_name+'/Without_watermark.pdf'
+        without_matermark_pdf = Folder_name+'/Without_watermark.pdf'
+        output_pdf = Folder_name+'/output.pdf'
+        final_pdf = Folder_name+'/Final.pdf'
         os.makedirs(Folder_name,exist_ok=True)
         width_cm = 5.00
         height_cm = 1.44
-        # without_header_footer_file_path = remove_header_footerssss(input_pdf_path,Folder_name+'/without_header_footer.pdf',70, 70)
-        docx_path =  convert_docx_to_pdf_windows(input_pdf_path,Folder_name)
+        without_header_footer_file_path = remove_header_footerssss(input_pdf_path,Folder_name+'/without_header_footer.pdf',70, 70)
+        docx_path =  convert_docx_to_pdf_windows(without_header_footer_file_path,Folder_name)
         doc = Document(docx_path)
         remove_header_footer(doc)
         Format_doc(doc)
@@ -26,7 +28,7 @@ def Get_New_PDF(input_pdf_path,Header_image_path):
         remove_content_above_first_heading(doc)
         headings = [paragraph.text.strip().split('\n')[0] for paragraph in doc.paragraphs if is_heading(paragraph)]
         headings_to_remove = prompt_for_headings_to_remove(headings)
-        # version = input('Please Version of Document: ')
+        version = input('Please Version of Document: ')
         if headings_to_remove:
             remove_headings_with_content(doc,headings_to_remove)
         set_page_size_to_a4(doc)
@@ -40,15 +42,14 @@ def Get_New_PDF(input_pdf_path,Header_image_path):
         add_footer_with_page_number(doc)
         doc.save(output_docx)
         update_toc_with_win32(output_docx)
-        # add_watermark(output_docx,"Flexon")
-        # convert_docx_to_pdf(output_docx,output_pdf)
-        # convert(output_docx, output_pdf)
-        # print(f"PDF At Final.pdf")
-        # Docx_path = convert_pdf_to_docx(input_pdf_path)
+        convert_docx_to_pdf(output_docx,without_matermark_pdf)
+        add_custom_page_at_start(without_matermark_pdf,output_pdf,Header_image_path,version)
+        add_watermark_to_pdf(output_pdf,final_pdf)
+        print('Final PDf At', final_pdf)
+        print('Docx At:', output_docx)
     except Exception as e:
         print('Error',e)
-    # finally:
-    #     shutil.rmtree(Folder_name)
+
 
 
 
