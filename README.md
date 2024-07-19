@@ -23,7 +23,7 @@ This project provides a Python script to convert PDF files to DOCX, perform vari
 
 ## Requirements
 
-- Python 3.7 or higher
+- `Python 3.7 or higher`
 - `python-docx`
 - `docx2pdf`
 - `shutil`
